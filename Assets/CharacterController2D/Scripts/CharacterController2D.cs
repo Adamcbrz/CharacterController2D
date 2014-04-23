@@ -149,7 +149,7 @@ public class CharacterController2D : MonoBehaviour
 	public bool isGrounded { get { return collisionState.below; } }
 
 	private const float kSkinWidthFloatFudgeFactor = 0.001f;
-
+	
 	#endregion
 
 
@@ -247,6 +247,7 @@ public class CharacterController2D : MonoBehaviour
 		if( deltaMovement.y < 0 && wasGroundedBeforeMoving )
 			handleVerticalSlope( ref deltaMovement );
 
+
 		// now we check movement in the horizontal dir
 		if( deltaMovement.x != 0 )
 			moveHorizontally( ref deltaMovement );
@@ -299,6 +300,17 @@ public class CharacterController2D : MonoBehaviour
 		// vertical
 		var colliderUseableWidth = boxCollider.size.x * Mathf.Abs( transform.localScale.x ) - ( 2f * _skinWidth );
 		_horizontalDistanceBetweenRays = colliderUseableWidth / ( totalVerticalRays - 1 );
+	}
+
+	public bool canModifyCollisionSize(Vector3 size)
+	{
+		//var colliderUseableHeight = size.y * Mathf.Abs( transform.localScale.y ) - ( 2f * _skinWidth );
+		//var targetVerticalDistanceBetweenRays = colliderUseableHeight / ( totalHorizontalRays - 1 );
+		Vector3 deltaMovement = new Vector3(0, size.y - boxCollider.size.y, 0) * 1.5f;
+		Vector3 tempMovement = deltaMovement;
+		moveVertically (ref tempMovement);
+		Debug.Log (deltaMovement + " == " + tempMovement);
+		return (deltaMovement == tempMovement);
 	}
 
 
@@ -421,7 +433,6 @@ public class CharacterController2D : MonoBehaviour
 
 	private bool handleHorizontalSlope( ref Vector3 deltaMovement, float angle, bool isGoingRight )
 	{
-		Debug.Log( "angle: " + angle );
 		// disregard 90 degree angles (walls)
 		if( Mathf.RoundToInt( angle ) == 90 )
 			return false;
@@ -456,7 +467,6 @@ public class CharacterController2D : MonoBehaviour
 		}
 		else // too steep. get out of here
 		{
-			Debug.Log( "TOO STEEP" );
 			deltaMovement.x = 0;
 		}
 
@@ -483,15 +493,18 @@ public class CharacterController2D : MonoBehaviour
 		{
 			var ray = new Vector2( initialRayOrigin.x + i * _horizontalDistanceBetweenRays, initialRayOrigin.y );
 
-			DrawRay( ray, rayDirection * rayDistance, Color.red );
+
+
 			_raycastHit = Physics2D.Raycast( ray, rayDirection, rayDistance, mask );
 			if( _raycastHit )
 			{
 				// set our new deltaMovement and recalculate the rayDistance taking it into account
 				deltaMovement.y = _raycastHit.point.y - ray.y;
-				rayDistance = Mathf.Abs( deltaMovement.y );
+				float _rayDistance = Mathf.Abs( deltaMovement.y );
 
+				DrawRay( ray, rayDirection * _rayDistance, Color.red );
 				// remember to remove the skinWidth from our deltaMovement
+
 				if( isGoingUp )
 				{
 					deltaMovement.y -= _skinWidth;
@@ -507,13 +520,16 @@ public class CharacterController2D : MonoBehaviour
 
 				// we add a small fudge factor for the float operations here. if our rayDistance is smaller
 				// than the width + fudge bail out because we have a direct impact
-				if( rayDistance < _skinWidth + kSkinWidthFloatFudgeFactor )
+				if( _rayDistance < _skinWidth + kSkinWidthFloatFudgeFactor )
 					return;
+			}
+			else
+			{
+				DrawRay( ray, rayDirection * rayDistance, Color.red );
 			}
 		}
 	}
-
-
+	
 	/// <summary>
 	/// checks the center point under the BoxCollider2D for a slope. If it finds one then the deltaMovement is adjusted so that
 	/// the player stays grounded and the slopeSpeedModifier is taken into account to speed up movement.
