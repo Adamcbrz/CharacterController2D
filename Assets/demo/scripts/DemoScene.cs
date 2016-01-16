@@ -1,8 +1,9 @@
 ﻿using UnityEngine;
 using System.Collections;
+using Prime31;
 
 
-public class PhysicsPlayerTester : MonoBehaviour
+public class DemoScene : MonoBehaviour
 {
 	// movement config
 	public float gravity = -25f;
@@ -18,12 +19,6 @@ public class PhysicsPlayerTester : MonoBehaviour
 	private Animator _animator;
 	private RaycastHit2D _lastControllerColliderHit;
 	private Vector3 _velocity;
-
-	// input
-	private bool _right;
-	private bool _left;
-	private bool _up;
-
 
 
 	void Awake()
@@ -42,6 +37,10 @@ public class PhysicsPlayerTester : MonoBehaviour
 
 	void onControllerCollider( RaycastHit2D hit )
 	{
+		// bail out on plain old ground hits cause they arent very interesting
+		if( hit.normal.y == 1f )
+			return;
+
 		// logs any collider hits if uncommented. it gets noisy so it is commented out for the demo
 		//Debug.Log( "flags: " + _controller.collisionState + ", hit.normal: " + hit.normal );
 	}
@@ -61,71 +60,66 @@ public class PhysicsPlayerTester : MonoBehaviour
 	#endregion
 
 
-	// the Update loop only gathers input. Actual movement is handled in FixedUpdate because we are using the Physics system for movement
+	// the Update loop contains a very simple example of moving the character around and controlling the animation
 	void Update()
 	{
-		// a minor bit of trickery here. FixedUpdate sets _up to false so to ensure we never miss any jump presses we leave _up
-		// set to true if it was true the previous frame
-		_up = _up || Input.GetKeyDown( KeyCode.UpArrow );
-		_right = Input.GetKey( KeyCode.RightArrow );
-		_left = Input.GetKey( KeyCode.LeftArrow );
-	}
-
-
-	void FixedUpdate()
-	{
-		// grab our current _velocity to use as a base for all calculations
-		_velocity = _controller.velocity;
-		
 		if( _controller.isGrounded )
 			_velocity.y = 0;
-		
-		if( _right )
+
+		if( Input.GetKey( KeyCode.RightArrow ) )
 		{
 			normalizedHorizontalSpeed = 1;
 			if( transform.localScale.x < 0f )
 				transform.localScale = new Vector3( -transform.localScale.x, transform.localScale.y, transform.localScale.z );
-			
+
 			if( _controller.isGrounded )
 				_animator.Play( Animator.StringToHash( "Run" ) );
 		}
-		else if( _left )
+		else if( Input.GetKey( KeyCode.LeftArrow ) )
 		{
 			normalizedHorizontalSpeed = -1;
 			if( transform.localScale.x > 0f )
 				transform.localScale = new Vector3( -transform.localScale.x, transform.localScale.y, transform.localScale.z );
-			
+
 			if( _controller.isGrounded )
 				_animator.Play( Animator.StringToHash( "Run" ) );
 		}
 		else
 		{
 			normalizedHorizontalSpeed = 0;
-			
+
 			if( _controller.isGrounded )
 				_animator.Play( Animator.StringToHash( "Idle" ) );
 		}
-		
-		
+
+
 		// we can only jump whilst grounded
-		if( _controller.isGrounded && _up )
+		if( _controller.isGrounded && Input.GetKeyDown( KeyCode.UpArrow ) )
 		{
 			_velocity.y = Mathf.Sqrt( 2f * jumpHeight * -gravity );
 			_animator.Play( Animator.StringToHash( "Jump" ) );
 		}
-		
-		
-		// apply horizontal speed smoothing it
+
+
+		// apply horizontal speed smoothing it. dont really do this with Lerp. Use SmoothDamp or something that provides more control
 		var smoothedMovementFactor = _controller.isGrounded ? groundDamping : inAirDamping; // how fast do we change direction?
-		_velocity.x = Mathf.Lerp( _velocity.x, normalizedHorizontalSpeed * runSpeed, Time.fixedDeltaTime * smoothedMovementFactor );
-		
+		_velocity.x = Mathf.Lerp( _velocity.x, normalizedHorizontalSpeed * runSpeed, Time.deltaTime * smoothedMovementFactor );
+
 		// apply gravity before moving
-		_velocity.y += gravity * Time.fixedDeltaTime;
+		_velocity.y += gravity * Time.deltaTime;
 
-		_controller.move( _velocity * Time.fixedDeltaTime );
+		// if holding down bump up our movement amount and turn off one way platform detection for a frame.
+		// this lets uf jump down through one way platforms
+		if( _controller.isGrounded && Input.GetKey( KeyCode.DownArrow ) )
+		{
+			_velocity.y *= 3f;
+			_controller.ignoreOneWayPlatformsThisFrame = true;
+		}
 
-		// reset input
-		_up = false;
+		_controller.move( _velocity * Time.deltaTime );
+
+		// grab our current _velocity to use as a base for all calculations
+		_velocity = _controller.velocity;
 	}
 
 }
